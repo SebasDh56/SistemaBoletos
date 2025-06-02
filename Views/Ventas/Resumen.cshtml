@@ -1,0 +1,83 @@
+﻿@model dynamic
+
+@{
+    ViewData["Title"] = "Resumen de Ventas";
+}
+
+<div class="card mb-4 shadow">
+    <div class="card-header py-3">
+        <h6 class="font-weight-bold text-primary m-0">@ViewData["Title"]</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table-bordered table">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Cooperativa</th>
+                        <th>Boletos Vendidos</th>
+                        <th>Boletos Faltantes</th>
+                        <th>Total Ventas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td>@item.Nombre</td>
+                            <td>@item.BoletosVendidos</td>
+                            <td>@item.BoletosFaltantes</td>
+                            <td>@item.TotalVentas.ToString("C")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card border-left-primary h-100 py-2 shadow">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="font-weight-bold text-primary text-uppercase mb-1 text-xs">
+                                    Precio por Boleto
+                                </div>
+                                <div class="h5 font-weight-bold mb-0 text-gray-800">
+                                    @ViewBag.PrecioBoleto.ToString("C")
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="bi bi-ticket-perforated fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-left-success h-100 py-2 shadow">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="font-weight-bold text-success text-uppercase mb-1 text-xs">
+                                    Comisión para Imbaburapac
+                                </div>
+                                <div class="h5 font-weight-bold mb-0 text-gray-800">
+                                    @ViewBag.ComisionImbaburapac.ToString("C")
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="bi bi-cash-stack fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <a asp-action="Index" class="btn btn-primary">
+                <i class="bi bi-list-ul"></i> Ver Historial
+            </a>
+        </div>
+    </div>
+</div>

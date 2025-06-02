@@ -1,91 +1,126 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using SistemaBoletos.Models;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace SistemaBoletos.Controllers
 {
     public class VentasController : Controller
     {
         private readonly AppDbContext _context;
+        private const decimal PrecioBoleto = 3.50m;
 
         public VentasController(AppDbContext context)
         {
             _context = context;
         }
 
-        // GET: Ventas/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Index()
         {
-            ViewData["PersonaId"] = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(_context.Personas, "Id", "Nombre");
-            return View();
+            var ventas = await _context.Ventas
+                .Include(v => v.Persona)
+                .Include(v => v.Cooperativa)
+                .OrderByDescending(v => v.Fecha)
+                .Take(50)
+                .ToListAsync();
+
+            return View(ventas);
         }
 
-        // POST: Ventas/Create
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,PersonaId,CantidadBoletos")] Venta venta)
+        public async Task<IActionResult> Create()
         {
-            if (ModelState.IsValid)
+            var personas = await _context.Personas.ToListAsync();
+            if (!personas.Any())
             {
-                // Obtener la cooperativa Imbaburapac (Id = 1)
-                var imbaburapac = await _context.Cooperativas.FindAsync(1);
-                var lagos = await _context.Cooperativas.FindAsync(2);
-
-                if (imbaburapac == null || lagos == null)
-                {
-                    ModelState.AddModelError("", "Cooperativas no configuradas correctamente.");
-                    return View(venta);
-                }
-
-                // Verificar capacidad de Imbaburapac
-                var boletosVendidosImbaburapac = _context.Ventas
-                    .Where(v => v.CooperativaId == 1)
-                    .Sum(v => v.CantidadBoletos);
-
-                if (boletosVendidosImbaburapac + venta.CantidadBoletos <= imbaburapac.CapacidadMaxima)
-                {
-                    // Asignar a Imbaburapac sin comisión
-                    venta.CooperativaId = 1;
-                    venta.AplicaComision = false;
-                    imbaburapac.BoletosVendidos += venta.CantidadBoletos;
-                }
-                else
-                {
-                    // Asignar a Lagos con comisión para Imbaburapac
-                    venta.CooperativaId = 2;
-                    venta.AplicaComision = true;
-                    lagos.BoletosVendidos += venta.CantidadBoletos;
-                }
-
-                venta.PrecioUnitario = 3.50m; // Precio fijo
-                _context.Add(venta);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                TempData["Error"] = "Debe registrar al menos una persona antes de crear ventas";
+                return RedirectToAction("Create", "Personas");
             }
 
-            ViewData["PersonaId"] = new Microsoft.AspNetCore.Mvc.Rendering.SelectList(_context.Personas, "Id", "Nombre", venta.PersonaId);
+            ViewData["PersonaId"] = new SelectList(personas, "Id", "CedulaNombre");
+            return View();
+        }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(Venta venta)
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    // Verificar que la persona existe
+                    var persona = await _context.Personas.FindAsync(venta.PersonaId);
+                    if (persona == null)
+                    {
+                        ModelState.AddModelError("PersonaId", "La persona seleccionada no existe");
+                        throw new Exception("Persona no encontrada");
+                    }
+
+                    var imbaburapac = await _context.Cooperativas.FindAsync(1);
+                    var lagos = await _context.Cooperativas.FindAsync(2);
+
+                    // Calcular boletos vendidos en Imbaburapac
+                    var boletosVendidos = await _context.Ventas
+                        .Where(v => v.CooperativaId == 1)
+                        .SumAsync(v => v.Cantidad);
+
+                    if (boletosVendidos + venta.Cantidad <= imbaburapac.CapacidadMaxima)
+                    {
+                        venta.CooperativaId = 1;
+                        venta.AplicaComision = false;
+                    }
+                    else
+                    {
+                        venta.CooperativaId = 2;
+                        venta.AplicaComision = true;
+                    }
+
+                    venta.PrecioUnitario = 3.50m;
+                    venta.Fecha = DateTime.Now;
+
+                    _context.Add(venta);
+                    await _context.SaveChangesAsync();
+
+                    TempData["Success"] = $"Venta registrada exitosamente para {persona.NombreCompleto}. Total: ${venta.Total.ToString("0.00")}";
+                    return RedirectToAction(nameof(Index));
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log del error (puedes ver esto en la consola de depuración)
+                Console.WriteLine($"Error al registrar venta: {ex.Message}");
+            }
+
+            // Si llegamos aquí, hubo un error
+            var personas = await _context.Personas.ToListAsync();
+            ViewData["PersonaId"] = new SelectList(personas, "Id", "CedulaNombre", venta.PersonaId);
+            TempData["Error"] = "Error al registrar la venta. Revise los datos.";
             return View(venta);
         }
-
-        // GET: Ventas/Resumen
         public async Task<IActionResult> Resumen()
         {
             var cooperativas = await _context.Cooperativas
-                .Select(c => new
-                {
-                    c.Nombre,
-                    c.BoletosVendidos,
-                    BoletosFaltantes = c.CapacidadMaxima - c.BoletosVendidos,
-                    TotalVentas = _context.Ventas
-                        .Where(v => v.CooperativaId == c.Id)
-                        .Sum(v => v.Total),
-                    ComisionImbaburapac = c.Id == 2 ? _context.Ventas
-                        .Where(v => v.CooperativaId == c.Id)
-                        .Sum(v => v.ComisionImbaburapac) : 0m
-                })
+                .Include(c => c.Ventas)
                 .ToListAsync();
 
-            return View(cooperativas);
+            var resumen = cooperativas.Select(c => new
+            {
+                c.Nombre,
+                BoletosVendidos = c.Ventas.Sum(v => v.Cantidad),
+                TotalVentas = c.Ventas.Sum(v => v.Cantidad * v.PrecioUnitario),
+                BoletosFaltantes = c.Id == 1 ? Math.Max(0, c.CapacidadMaxima - c.Ventas.Sum(v => v.Cantidad)) : 0
+            }).ToList();
+
+            var ventasConComision = await _context.Ventas
+                .Where(v => v.CooperativaId == 2 && v.AplicaComision)
+                .SumAsync(v => v.Cantidad * v.PrecioUnitario);
+
+            ViewBag.ComisionImbaburapac = ventasConComision * 0.10m;
+            ViewBag.PrecioBoleto = PrecioBoleto;
+
+            return View(resumen);
         }
     }
 }

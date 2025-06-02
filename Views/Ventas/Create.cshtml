@@ -1,39 +1,64 @@
 ﻿@model SistemaBoletos.Models.Venta
 
 @{
-    ViewData["Title"] = "Registrar Venta";
+    ViewData["Title"] = "Nueva Venta";
 }
 
-<h1>Registrar Venta</h1>
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
 
-<hr />
-<div class="row">
-    <div class="col-md-4">
+<div class="card shadow">
+    <div class="card-header bg-primary text-white">
+        <h3>@ViewData["Title"]</h3>
+    </div>
+    <div class="card-body">
         <form asp-action="Create">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="form-group">
-                <label asp-for="PersonaId" class="control-label"></label>
-                <select asp-for="PersonaId" class="form-control" asp-items="ViewBag.PersonaId"></select>
+
+            <div class="form-group mb-3">
+                <label asp-for="PersonaId" class="form-label">Persona</label>
+                <select asp-for="PersonaId" class="form-select" asp-items="ViewBag.PersonaId">
+                    <option value="">-- Seleccione una persona --</option>
+                </select>
                 <span asp-validation-for="PersonaId" class="text-danger"></span>
             </div>
-            <div class="form-group">
-                <label asp-for="CantidadBoletos" class="control-label"></label>
-                <input asp-for="CantidadBoletos" class="form-control" />
-                <span asp-validation-for="CantidadBoletos" class="text-danger"></span>
+
+            <div class="form-group mb-3">
+                <label asp-for="Cantidad" class="form-label">Cantidad de Boletos</label>
+                <input asp-for="Cantidad" class="form-control" min="1" value="1" />
+                <span asp-validation-for="Cantidad" class="text-danger"></span>
             </div>
-            <div class="form-group">
-                <input type="submit" value="Registrar" class="btn btn-primary" />
+
+            <div class="form-group mt-4">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Registrar Venta
+                </button>
+                <a asp-action="Index" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Volver
+                </a>
             </div>
         </form>
     </div>
-</div>
-
-<div>
-    <a asp-action="Index">Volver a la lista</a>
 </div>
 
 @section Scripts {
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
+
+    <script>
+        // Mostrar errores de validación específicos
+        $(document).ready(function() {
+            $('form').submit(function() {
+                if (!$(this).valid()) {
+                    $('.field-validation-error').css('display', 'block');
+                }
+            });
+        });
+    </script>
 }
